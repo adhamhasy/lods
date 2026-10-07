@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "freelod",
+  "version": "${version}",
+  "name": "Free LOD",
+  "description": "Distant-Horizons-style simplified far terrain with no minimum: LOD distance is fully independent of render distance.",
+  "authors": [
+    "you"
+  ],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.freelod.client.FreeLodClient"
+    ],
+    "modmenu": [
+      "com.freelod.client.LodModMenu"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "modmenu": "*"
+  }
+}
