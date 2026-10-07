@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.IntegratedServer;
+import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.ChunkPos;
@@ -119,7 +119,8 @@ public final class LodStore {
 		}
 
 		Map<Long, Col> map = dim(dimKey);
-		map.put(key(pos.x, pos.z), new Col(pos.x, pos.z, out.toArray(new Rect[0]), CLOCK.incrementAndGet()));
+		int ccx = pos.getMinBlockX() >> 4, ccz = pos.getMinBlockZ() >> 4;
+		map.put(key(ccx, ccz), new Col(ccx, ccz, out.toArray(new Rect[0]), CLOCK.incrementAndGet()));
 		trim(map);
 	}
 
