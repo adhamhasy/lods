@@ -11,10 +11,57 @@ jobs:
           java-version: 25
           distribution: temurin
       - name: Build
+        id: build
+        continue-on-error: true
         run: |
           chmod +x gradlew
           ./gradlew build
+      - name: API dump (diagnostic, prints real class/method names)
+        if: always()
+        run: |
+          set +e
+          echo "=== finding Minecraft jar ==="
+          MCJAR=""
+          for j in $(find ~/.gradle . -name "*.jar" -size +5M 2>/dev/null); do
+            if unzip -l "$j" 2>/dev/null | grep -q "net/minecraft/client/Minecraft.class"; then MCJAR="$j"; break; fi
+          done
+          echo "MCJAR=$MCJAR"
+          if [ -n "$MCJAR" ]; then
+            echo "=== Minecraft: screen/server methods ==="
+            javap -cp "$MCJAR" net.minecraft.client.Minecraft | grep -iE "screen|singleplayer|options|gui "
+            echo "=== GameRenderer: camera ==="
+            javap -cp "$MCJAR" net.minecraft.client.renderer.GameRenderer | grep -iE "camera"
+            echo "=== Camera class ==="
+            javap -cp "$MCJAR" net.minecraft.client.Camera | grep -iE "pos|public"
+            echo "=== ChunkPos ==="
+            javap -cp "$MCJAR" net.minecraft.world.level.ChunkPos | grep -iE " x\(| z\(|getMinBlock"
+            echo "=== IntegratedServer class location ==="
+            unzip -l "$MCJAR" | grep -E "IntegratedServer.class"
+            echo "=== RenderTypes / RenderType classes ==="
+            unzip -l "$MCJAR" | grep -E "/RenderTypes?.class"
+            echo "=== VertexConsumer ==="
+            javap -cp "$MCJAR" com.mojang.blaze3d.vertex.VertexConsumer | grep -iE "addVertex|setColor"
+            echo "=== PoseStack ==="
+            javap -cp "$MCJAR" com.mojang.blaze3d.vertex.PoseStack | grep -iE "translate|last|push|pop"
+            echo "=== Level min height ==="
+            javap -cp "$MCJAR" net.minecraft.world.level.LevelHeightAccessor | grep -iE "min|height"
+          fi
+          echo "=== Fabric API rendering classes ==="
+          for j in $(find ~/.gradle -name "fabric-rendering*.jar" ! -name "*sources*" 2>/dev/null); do
+            echo "-- $j"
+            unzip -l "$j" | grep -iE "LevelRender|WorldRender" | awk '{print $4}'
+          done
+          for j in $(find ~/.gradle -name "fabric-rendering*.jar" ! -name "*sources*" 2>/dev/null); do
+            for c in $(unzip -l "$j" | awk '{print $4}' | grep -E "(LevelRenderEvents|LevelRenderContext|WorldRenderEvents|WorldRenderContext)\.class$"); do
+              cls=$(echo "$c" | sed 's/\.class$//; s#/#.#g')
+              echo "=== javap $cls ==="
+              javap -cp "$j:$MCJAR" "$cls" | grep -E "public"
+            done
+          done
+      - name: Fail if build failed
+        if: steps.build.outcome == 'failure'
+        run: exit 1
       - uses: actions/upload-artifact@v4
         with:
-          name: kidnapmod-jar
+          name: freelod-jar
           path: build/libs/
