@@ -4,8 +4,8 @@ import com.freelod.LodConfig;
 import com.freelod.LodStore;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.fabricmc.fabric.api.client.rendering.v1.world.LevelRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.world.LevelRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.world.phys.Vec3;
@@ -23,8 +23,8 @@ public final class LodRenderer {
 	private LodRenderer() {}
 
 	public static void register() {
-		// API: event that fires after translucent world rendering
-		LevelRenderEvents.AFTER_TRANSLUCENT_FEATURES.register(LodRenderer::render);
+		// API: event where mods hand geometry to the renderer (confirmed to exist in Fabric API for 26.3)
+		LevelRenderEvents.COLLECT_SUBMITS.register(LodRenderer::render);
 	}
 
 	private static void render(LevelRenderContext ctx) {
@@ -33,15 +33,18 @@ public final class LodRenderer {
 		if (cols.length == 0) return;
 
 		Minecraft mc = Minecraft.getInstance();
-		Vec3 cam = mc.gameRenderer.getMainCamera().position(); // API: camera position
-		PoseStack pose = ctx.poseStack(); // API: pose stack from the event context
-
-		VertexConsumer vc = ctx.consumers().getBuffer(RenderTypes.debugQuads()); // API: coloured-quad render type
+		Vec3 cam = mc.gameRenderer.mainCamera().position(); // confirmed: GameRenderer.mainCamera(), Camera.position()
+		PoseStack pose = ctx.poseStack();                   // confirmed: LevelRenderContext.poseStack()
 
 		pose.pushPose();
 		pose.translate(-cam.x, -cam.y, -cam.z);
-		Matrix4f m = pose.last().pose();
+		// API (unverified): hands a draw callback to the renderer, which runs it later with a vertex buffer
+		ctx.submitNodeCollector().submitCustomGeometry(pose, RenderTypes.debugQuads(),
+			(p, vc) -> draw(vc, p.pose(), cols));
+		pose.popPose();
+	}
 
+	private static void draw(VertexConsumer vc, Matrix4f m, LodStore.Col[] cols) {
 		float bright = (float) (LodConfig.num("brightness") / 100.0);
 		boolean shade = LodConfig.bool("side_shading");
 		int depth = LodConfig.i("column_depth");
@@ -67,7 +70,6 @@ public final class LodRenderer {
 				quad(vc, m, x1, y0, z0, x1, y1, z0, x1, y1, z1, x1, y0, z1, sx);   // east
 			}
 		}
-		pose.popPose();
 	}
 
 	private static int argb(int rgb, float f) {
